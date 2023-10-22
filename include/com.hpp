@@ -32,7 +32,9 @@ public:
       delete curr;
       curr = next;
     }
-    delete curr;
+
+    if (curr != nullptr)
+      delete curr;
   }
 
   void push(T &&value) {
@@ -93,7 +95,7 @@ template <typename T> class receiver {
 public:
   receiver<T>(std::shared_ptr<queue<T>> queue) : m_queue(queue) {}
 
-  receiver<T>(const receiver<T> &other) = delete;
+  receiver<T>(const receiver<T> &) = delete;
   receiver<T> &operator=(const receiver<T> &) = delete;
 
   std::unique_ptr<T> recv() { return m_queue->pop(); }
