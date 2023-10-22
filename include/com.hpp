@@ -15,20 +15,20 @@ template <typename T> struct queue_node {
 };
 
 template <typename T> class queue {
-  std::atomic<queue_node<T> *> head;
+  queue_node<T> *head;
   std::atomic<queue_node<T> *> tail;
 
 public:
   queue<T>() {
     queue_node<T> *dummy =
         new queue_node<T>{nullptr, std::unique_ptr<T>(nullptr)};
-    head.store(dummy);
+    head = dummy;
     tail.store(dummy);
   }
 
   ~queue<T>() {
-    queue_node<T> *curr = head.load();
-    while (curr->next != nullptr) {
+    queue_node<T> *curr = head;
+    while (curr->next.load() != nullptr) {
       queue_node<T> *next = curr->next.load();
       delete curr;
       curr = next;
@@ -47,40 +47,35 @@ public:
     queue_node<T> *t = tail.load();
 
     while (!t->next.compare_exchange_weak(expected, new_node)) {
-        t = tail.load();
-        expected = nullptr;
+      t = tail.load();
+      expected = nullptr;
     }
-      
+
     tail.store(new_node);
   }
 
   std::unique_ptr<T> pop() {
-    queue_node<T> *h = head.load();
+    while (head->next.load() == nullptr)
+      ;
 
-    while (h->next == nullptr) {
-      h = head.load();
-    }
-
-    head.compare_exchange_strong(h, h->next);
-    delete h;
-
-    h = head.load();
-    return std::move(h->value);
+    queue_node<T> *old_head = head;
+    head = head->next;
+    delete old_head;
+    return std::move(head->value);
   }
 
   std::optional<std::unique_ptr<T>> try_pop() {
-    queue_node<T> *h = head.load();
-
-    if (h->next == nullptr) {
+    if (head->next.load() == nullptr) {
       return std::nullopt;
     }
 
-    delete head.exchange(h->next);
-    h = head.load();
-    return std::optional<T>{std::move(h->value)};
+    queue_node<T> *old_head = head;
+    head = head->next;
+    delete old_head;
+    return std::optional<T>{std::move(head->value)};
   }
 
-  bool empty() { return head.load()->next == nullptr; }
+  bool empty() { return head->next.load() == nullptr; }
 };
 
 template <typename T> class sender {
