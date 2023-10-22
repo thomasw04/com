@@ -1,6 +1,7 @@
 
 #include <algorithm>
 #include <atomic>
+#include <cstddef>
 #include <memory>
 #include <optional>
 #include <tuple>
@@ -38,16 +39,18 @@ public:
   }
 
   void push(T &&value) {
-    queue_node<T> *dummy = nullptr;
+    queue_node<T> *expected = nullptr;
 
     queue_node<T> *const new_node =
         new queue_node<T>{nullptr, std::make_unique<T>(std::move(value))};
 
     queue_node<T> *t = tail.load();
 
-    while (!t->next.compare_exchange_weak(dummy, new_node))
-      t = tail.load();
-
+    while (!t->next.compare_exchange_weak(expected, new_node)) {
+        t = tail.load();
+        expected = nullptr;
+    }
+      
     tail.store(new_node);
   }
 
